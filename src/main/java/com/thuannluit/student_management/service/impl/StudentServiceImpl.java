@@ -7,17 +7,18 @@ import com.thuannluit.student_management.mapper.StudentMapper;
 import com.thuannluit.student_management.repository.StudentRepository;
 import com.thuannluit.student_management.service.StudentService;
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class StudentServiceImpl implements StudentService {
 
     @Autowired
     StudentRepository studentRepository;
-
     @Autowired
     StudentMapper studentMapper;
 
@@ -33,9 +34,13 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public StudentDTO getStudentById(String id) {
-        return studentRepository.findById(Integer.valueOf(id))
-                .map(studentMapper::toStudentDto)
-                .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + id));
+
+        Integer studentId = parseId(id);
+
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("student.not.found"));
+
+        return studentMapper.toStudentDto(student);
     }
 
     @Override
@@ -48,19 +53,40 @@ public class StudentServiceImpl implements StudentService {
     @Override
     @Transactional
     public StudentDTO updateStudent(String id, StudentDTO studentDTO) {
-        Student existingStudent = studentRepository.findById(Integer.valueOf(id))
-                .orElseThrow(() -> new ResourceNotFoundException("Cannot update. Student not found with id: " + id));
+
+        Integer studentId = parseId(id);
+
+        Student existingStudent = studentRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("student.not.found"));
+
         studentMapper.updateStudentFromDto(studentDTO, existingStudent);
-        Student updatedStudent = studentRepository.save(existingStudent);
-        return studentMapper.toStudentDto(updatedStudent);
+
+        Student updated = studentRepository.save(existingStudent);
+
+        return studentMapper.toStudentDto(updated);
     }
 
     @Override
     @Transactional
     public void deleteStudent(String id) {
-        if (!studentRepository.existsById(Integer.valueOf(id))) {
-            throw new ResourceNotFoundException("Cannot delete. Student not found with id: " + id);
+
+        Integer studentId = parseId(id);
+
+        if (!studentRepository.existsById(studentId)) {
+            throw new ResourceNotFoundException("student.not.found");
         }
-        studentRepository.deleteById(Integer.valueOf(id));
+
+        studentRepository.deleteById(studentId);
+    }
+
+    // =========================
+    // HELPER
+    // =========================
+    private Integer parseId(String id) {
+        try {
+            return Integer.valueOf(id);
+        } catch (NumberFormatException ex) {
+            throw new ResourceNotFoundException("student.invalid.id");
+        }
     }
 }

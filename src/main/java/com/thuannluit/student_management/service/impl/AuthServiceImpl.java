@@ -7,17 +7,20 @@ import com.thuannluit.student_management.dto.request.LoginRequest;
 import com.thuannluit.student_management.dto.request.RegisterRequest;
 import com.thuannluit.student_management.entity.Roles;
 import com.thuannluit.student_management.entity.Users;
+import com.thuannluit.student_management.exception.AppException;
 import com.thuannluit.student_management.exception.ResourceNotFoundException;
 import com.thuannluit.student_management.repository.RoleRepository;
 import com.thuannluit.student_management.repository.UserRepository;
 import com.thuannluit.student_management.security.JwtUtil;
 import com.thuannluit.student_management.service.AuthService;
+import com.thuannluit.student_management.service.MessageService;
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,89 +28,144 @@ import org.springframework.stereotype.Service;
 import java.util.Set;
 
 @Service
+@RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
     @Autowired
-    UserRepository authRepository;
-    @Autowired
-    RoleRepository roleRepository;
-
-    @Autowired
-    private  AuthenticationManager authenticationManager;
-    @Autowired
-    private JwtUtil jwtUtil;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private CustomerUserDetailsService userDetailsService;
+    UserRepository userRepository;
+    @Autowired RoleRepository roleRepository;
+    @Autowired AuthenticationManager authenticationManager;
+    @Autowired JwtUtil jwtUtil;
+    @Autowired PasswordEncoder passwordEncoder;
+    @Autowired CustomerUserDetailsService userDetailsService;
+    @Autowired MessageService messageService;
 
     @Override
     @Transactional
     public String register(RegisterRequest request) {
-        boolean isExist = userDetailsService.userExists(request.email());
+
+        validateRegister(request);
+
+        if (userDetailsService.userExists(request.email())) {
+            throw new AppException("auth.user.exists", HttpStatus.BAD_REQUEST);
+        }
 
         Roles roleUser = roleRepository.findByRoleName("ROLE_USER")
-                .orElseThrow(() -> new RuntimeException("Role USER not found"));
+                .orElseThrow(() -> new AppException("role.not.found", HttpStatus.INTERNAL_SERVER_ERROR));
 
-        Set<Roles> roles = Set.of(roleUser);
+        userDetailsService.saveUser(new Users(
+                request.email(),
+                passwordEncoder.encode(request.password()),
+                Set.of(roleUser)
+        ));
 
-        if (!isExist) {
-            userDetailsService.saveUser(new Users(
-                    request.email(),
-                    passwordEncoder.encode(request.password()),
-                    roles)
-            );
-        }
-        return "User registered successfully";
+        return messageService.get("auth.register.success");
     }
 
     @Override
     @Transactional
     public String registerAdmin(RegisterRequest request) {
-        boolean isExist = userDetailsService.userExists(request.email());
 
-        Roles roleUser = roleRepository.findByRoleName("ROLE_ADMIN")
-                .orElseThrow(() -> new RuntimeException("Role ADMIN not found"));
-
-        Set<Roles> roles = Set.of(roleUser);
-
-        if (!isExist) {
-            userDetailsService.saveUser(new Users(
-                    request.email(),
-                    passwordEncoder.encode(request.password()),
-                    roles)
-            );
+        if (userDetailsService.userExists(request.email())) {
+            throw new AppException("auth.user.exists", HttpStatus.BAD_REQUEST);
         }
-        return "Admin registered successfully";
+
+        Roles roleAdmin = roleRepository.findByRoleName("ROLE_ADMIN")
+                .orElseThrow(() -> new AppException("role.not.found", HttpStatus.INTERNAL_SERVER_ERROR));
+
+        userDetailsService.saveUser(new Users(
+                request.email(),
+                passwordEncoder.encode(request.password()),
+                Set.of(roleAdmin)
+        ));
+
+        return messageService.get("auth.register.admin.success");
     }
 
     @Override
     @Transactional
     public LoginResponse login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.email(),
-                        request.password()
-                )
-        );
 
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        assert userDetails != null;
-        String token = jwtUtil.generateToken(userDetails);
-        return new LoginResponse(token, userDetails.getUsername());
+        validateLogin(request);
+
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.email(),
+                            request.password()
+                    )
+            );
+
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+
+            String token = jwtUtil.generateToken(userDetails);
+
+            return new LoginResponse(token, userDetails.getUsername());
+
+        } catch (Exception ex) {
+            throw new AppException("auth.login.fail", HttpStatus.UNAUTHORIZED);
+        }
     }
 
     @Override
     @Transactional
     public ChangePasswordResponse changePassword(ChangePasswordRequest request) {
-        Users existingUser = authRepository.findById(Integer.valueOf(request.id()))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.id()));
 
-        existingUser.setPassword(passwordEncoder.encode(request.newPassword()));
+        validateChangePassword(request);
 
-        authRepository.save(existingUser);
+        Users user = userRepository.findById(Integer.valueOf(request.id()))
+                .orElseThrow(() -> new ResourceNotFoundException("user.not.found"));
 
-        return new ChangePasswordResponse("Password changed successfully");
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+
+        userRepository.save(user);
+
+        return new ChangePasswordResponse(
+                messageService.get("auth.password.changed")
+        );
+    }
+
+
+    private void validateRegister(RegisterRequest request) {
+
+        validateEmail(request.email());
+        validatePassword(request.password());
+    }
+
+    private void validateLogin(LoginRequest request) {
+
+        validateEmail(request.email());
+        validatePassword(request.password());
+    }
+
+    private void validateChangePassword(ChangePasswordRequest request) {
+
+        if (request.id() == null || request.id().isBlank()) {
+            throw new AppException("user.invalid.id", HttpStatus.BAD_REQUEST);
+        }
+
+        validatePassword(request.newPassword());
+    }
+
+    private void validateEmail(String email) {
+
+        if (email == null || email.isBlank()) {
+            throw new AppException("auth.email.required", HttpStatus.BAD_REQUEST);
+        }
+
+        if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            throw new AppException("auth.email.invalid", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private void validatePassword(String password) {
+
+        if (password == null || password.isBlank()) {
+            throw new AppException("auth.password.required", HttpStatus.BAD_REQUEST);
+        }
+
+        if (password.length() < 6) {
+            throw new AppException("auth.password.length", HttpStatus.BAD_REQUEST);
+        }
     }
 }

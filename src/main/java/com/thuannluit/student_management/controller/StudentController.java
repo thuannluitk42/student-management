@@ -22,7 +22,7 @@ public class StudentController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<StudentDTO> create(@Valid @RequestBody StudentDTO dto) {
+    public ResponseEntity<StudentDTO> create(@RequestBody StudentDTO dto) {
         StudentDTO saved = service.createStudent(dto);
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
@@ -40,7 +40,7 @@ public class StudentController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<StudentDTO> update(@PathVariable String id, @RequestBody StudentDTO student) {
+    public ResponseEntity<StudentDTO> update(@PathVariable String id,@RequestBody StudentDTO student) {
         StudentDTO std = service.updateStudent(id, student);
         return new ResponseEntity<>(std, HttpStatus.OK);
     }

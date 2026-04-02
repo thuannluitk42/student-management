@@ -4,6 +4,7 @@ import com.thuannluit.student_management.dto.request.ChangePasswordRequest;
 import com.thuannluit.student_management.dto.request.LoginRequest;
 import com.thuannluit.student_management.dto.request.RegisterRequest;
 import com.thuannluit.student_management.service.AuthService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
