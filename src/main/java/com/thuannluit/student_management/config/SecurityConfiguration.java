@@ -1,5 +1,6 @@
-package com.thuannluit.student_management.security;
+package com.thuannluit.student_management.config;
 
+import com.thuannluit.student_management.security.JWTAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -33,6 +34,8 @@ public class SecurityConfiguration {
                         (auth) -> auth
                                 .requestMatchers("/v1/auth/**").permitAll()
                                 .requestMatchers("/v1/students/**").permitAll()
+                                .requestMatchers("/swagger-ui/**").permitAll()
+                                .requestMatchers("/api-docs/**").permitAll()
                                 .anyRequest().authenticated()
                 );
         http.sessionManagement(
