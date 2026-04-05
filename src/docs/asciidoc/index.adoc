@@ -1,0 +1,80 @@
+= Student Management API Documentation
+:doctype: book
+:icons: font
+:source-highlighter: highlightjs
+:toc: left
+:toclevels: 3
+:sectlinks:
+
+[[overview]]
+== Overview
+Student Management REST API cung cấp các endpoint để quản lý sinh viên và xác thực người dùng.
+
+Base URL: `http://localhost:8080`
+
+[[authentication]]
+== Authentication & Authorization
+
+=== Register User
+Đăng ký tài khoản người dùng mới.
+
+operation::auth/register[snippets='curl-request,http-request,request-fields,http-response,response-body']
+
+=== Register Admin
+Đăng ký tài khoản admin mới.
+
+operation::auth/register-admin[snippets='curl-request,http-request,request-fields,http-response,response-body']
+
+=== Login
+Đăng nhập và nhận JWT token.
+
+operation::auth/login[snippets='curl-request,http-request,request-fields,http-response,response-fields']
+
+**Error Response (401 Unauthorized):**
+
+operation::auth/login-401[snippets='http-request,response-fields,curl-request']
+
+=== Change Password
+Đổi mật khẩu (yêu cầu xác thực).
+
+operation::auth/change-password[snippets='curl-request,http-request,request-fields,http-response,response-fields']
+
+[[students]]
+== Students
+
+=== Create Student
+Tạo sinh viên mới. Yêu cầu role `ADMIN`.
+
+operation::students/create[snippets='curl-request,http-request,request-fields,http-response,response-fields']
+
+=== Get All Students
+Lấy danh sách tất cả sinh viên.
+
+operation::students/get-all[snippets='curl-request,http-request,http-response,response-fields']
+
+=== Get Student by ID
+Lấy thông tin sinh viên theo mã.
+
+operation::students/get-by-id[snippets='curl-request,http-request,path-parameters,http-response,response-fields']
+
+**Error Response (404 Not Found):**
+
+operation::students/get-by-id-404[snippets='http-request,path-parameters,response-fields']
+
+=== Update Student
+Cập nhật thông tin sinh viên. Yêu cầu role `ADMIN`.
+
+operation::students/update[snippets='curl-request,http-request,path-parameters,request-fields,http-response,response-fields']
+
+**Error Response (404 Not Found):**
+
+operation::students/update-404[snippets='http-request,path-parameters,response-fields']
+
+=== Delete Student
+Xóa sinh viên. Yêu cầu role `ADMIN`.
+
+operation::students/delete[snippets='curl-request,http-request,path-parameters,http-response']
+
+**Error Response (404 Not Found):**
+
+operation::students/delete-404[snippets='http-request,path-parameters,response-fields']
