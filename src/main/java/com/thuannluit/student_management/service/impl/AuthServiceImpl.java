@@ -7,6 +7,8 @@ import com.thuannluit.student_management.dto.request.LoginRequest;
 import com.thuannluit.student_management.dto.request.RegisterRequest;
 import com.thuannluit.student_management.entity.Roles;
 import com.thuannluit.student_management.entity.Users;
+import com.thuannluit.student_management.event.AuthEvent;
+import com.thuannluit.student_management.event.AuthEventProducer;
 import com.thuannluit.student_management.exception.AppException;
 import com.thuannluit.student_management.exception.ResourceNotFoundException;
 import com.thuannluit.student_management.repository.RoleRepository;
@@ -26,6 +28,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.Set;
 
 @Service
@@ -40,6 +43,7 @@ public class AuthServiceImpl implements AuthService {
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired CustomerUserDetailsService userDetailsService;
     @Autowired MessageService messageService;
+    private final AuthEventProducer authEventProducer;
 
     @Override
     @Transactional
@@ -66,6 +70,16 @@ public class AuthServiceImpl implements AuthService {
         ));
 
         log.info("User registered successfully with email: {}", request.email());
+
+        authEventProducer.sendMessage(AuthEvent.builder()
+                .action("USER_REGISTERED")
+                .email(request.email())
+                .role("ROLE_USER")
+                .timestamp(Instant.now())
+                .build());
+
+//        emailService.sendWelcomeEmail(request.email(), request.email());
+
         return messageService.get("auth.register.success");
     }
 
@@ -92,6 +106,14 @@ public class AuthServiceImpl implements AuthService {
         ));
 
         log.info("Admin user registered successfully with email: {}", request.email());
+
+        authEventProducer.sendMessage(AuthEvent.builder()
+                .action("ADMIN_REGISTERED")
+                .email(request.email())
+                .role("ROLE_ADMIN")
+                .timestamp(Instant.now())
+                .build());
+
         return messageService.get("auth.register.admin.success");
     }
 

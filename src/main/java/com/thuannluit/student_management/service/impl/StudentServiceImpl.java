@@ -2,15 +2,17 @@ package com.thuannluit.student_management.service.impl;
 
 import com.thuannluit.student_management.dto.StudentDTO;
 import com.thuannluit.student_management.entity.Student;
+import com.thuannluit.student_management.event.StudentEvent;
+import com.thuannluit.student_management.event.StudentEventProducer;
 import com.thuannluit.student_management.exception.ResourceNotFoundException;
 import com.thuannluit.student_management.mapper.StudentMapper;
 import com.thuannluit.student_management.repository.StudentRepository;
-import com.thuannluit.student_management.service.StudentService;
-import jakarta.transaction.Transactional;
+import com.thuannluit.student_management.service.StudentService;import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
 
 import java.util.List;
 
@@ -19,10 +21,9 @@ import java.util.List;
 @Slf4j
 public class StudentServiceImpl implements StudentService {
 
-    @Autowired
-    StudentRepository studentRepository;
-    @Autowired
-    StudentMapper studentMapper;
+    private final StudentRepository studentRepository;
+    private final StudentMapper studentMapper;
+    private final StudentEventProducer studentEventProducer;
 
     @Override
     @Transactional
@@ -31,6 +32,8 @@ public class StudentServiceImpl implements StudentService {
 
         Student student = studentMapper.toEntity(studentDTO);
         Student saved = studentRepository.save(student);
+
+        sendEvent("CREATED", String.valueOf(saved.getStudentCode()), saved.getEmail(), "Student created");
 
         log.info("Student created successfully with ID: {}", saved.getStudentCode());
         return studentMapper.toStudentDto(saved);
@@ -80,6 +83,8 @@ public class StudentServiceImpl implements StudentService {
         studentMapper.updateStudentFromDto(studentDTO, existingStudent);
         Student updated = studentRepository.save(existingStudent);
 
+        sendEvent("UPDATED", String.valueOf(updated.getStudentCode()), updated.getEmail(), "Student updated");
+
         log.info("Student with ID: {} updated successfully", studentId);
         return studentMapper.toStudentDto(updated);
     }
@@ -91,13 +96,23 @@ public class StudentServiceImpl implements StudentService {
 
         Integer studentId = parseId(id);
 
-        if (!studentRepository.existsById(studentId)) {
-            log.warn("Failed to delete. Student not found for ID: {}", studentId);
-            throw new ResourceNotFoundException("student.not.found");
-        }
+        Student existingStudent = studentRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("student.not.found"));
+
+        sendEvent("DELETED", String.valueOf(existingStudent.getStudentCode()), existingStudent.getEmail(), "Student deleted");
 
         studentRepository.deleteById(studentId);
         log.info("Student with ID: {} deleted successfully", studentId);
+    }
+
+    private void sendEvent(String action, String studentId, String email, String message) {
+        studentEventProducer.sendMessage(StudentEvent.builder()
+                .action(action)
+                .studentId(studentId)
+                .email(email)
+                .message(message)
+                .timestamp(Instant.now())
+                .build());
     }
 
     private Integer parseId(String id) {
