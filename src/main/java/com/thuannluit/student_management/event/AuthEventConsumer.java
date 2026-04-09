@@ -1,10 +1,15 @@
 package com.thuannluit.student_management.event;
 
+import com.thuannluit.student_management.entity.ProcessedEvent;
+import com.thuannluit.student_management.repository.ProcessedEventRepository;
 import com.thuannluit.student_management.service.EmailService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+
+import java.time.Instant;
 
 @Component
 @RequiredArgsConstructor
@@ -12,35 +17,39 @@ import org.springframework.stereotype.Component;
 public class AuthEventConsumer {
 
     private final EmailService emailService;
+    private final ProcessedEventRepository processedEventRepository;
 
-    @KafkaListener(topics = "${kafka.auth.topic.name:auth-events}")
-    public void listen(String eventJson) {
-        log.info("Received auth event: {}", eventJson);
-
+    @KafkaListener(topics = "${kafka.auth.topic.name:auth-events}", groupId = "auth-group")
+    @Transactional
+    public void listen(AuthEvent event) {
         try {
-            String action = extractField(eventJson, "action");
+            log.info("Received auth event: {}", event);
 
-            if ("USER_REGISTERED".equals(action) || "ADMIN_REGISTERED".equals(action)) {
-                String email = extractField(eventJson, "email");
-                if (email != null && !email.isEmpty()) {
-                    emailService.sendWelcomeEmail(email, email);
+            if (isEventProcessed(event.getEventId().toString())) {
+                log.warn("Duplicate event received, skipping: {}", event.getEventId());
+                return;
+            }
+
+            if ("USER_REGISTERED".equals(event.getAction()) || "ADMIN_REGISTERED".equals(event.getAction())) {
+                if (event.getEmail() != null && !event.getEmail().isEmpty()) {
+                    emailService.sendWelcomeEmail(event.getEmail(), event.getEmail());
                 }
             }
+
+            markEventAsProcessed(event.getEventId().toString());
+
         } catch (Exception e) {
-            log.error("Failed to process auth event: {}", eventJson, e);
+            log.error("Failed to process auth event: {}", event, e);
         }
     }
 
-    private String extractField(String json, String field) {
-        try {
-            String key = "\"" + field + "\":\"";
-            int start = json.indexOf(key);
-            if (start == -1) return null;
-            start += key.length();
-            int end = json.indexOf("\"", start);
-            return json.substring(start, end);
-        } catch (Exception e) {
-            return null;
-        }
+    private boolean isEventProcessed(String eventId) {
+        return processedEventRepository.existsById(eventId);
+    }
+
+    private void markEventAsProcessed(String eventId) {
+        ProcessedEvent processedEvent = new ProcessedEvent(eventId, Instant.now());
+        processedEventRepository.save(processedEvent);
+        log.debug("Marked event as processed: {}", eventId);
     }
 }

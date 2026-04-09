@@ -7,14 +7,15 @@ import com.thuannluit.student_management.event.StudentEventProducer;
 import com.thuannluit.student_management.exception.ResourceNotFoundException;
 import com.thuannluit.student_management.mapper.StudentMapper;
 import com.thuannluit.student_management.repository.StudentRepository;
-import com.thuannluit.student_management.service.StudentService;import jakarta.transaction.Transactional;
+import com.thuannluit.student_management.service.StudentService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -107,6 +108,7 @@ public class StudentServiceImpl implements StudentService {
 
     private void sendEvent(String action, String studentId, String email, String message) {
         studentEventProducer.sendMessage(StudentEvent.builder()
+                .eventId(UUID.randomUUID())
                 .action(action)
                 .studentId(studentId)
                 .email(email)

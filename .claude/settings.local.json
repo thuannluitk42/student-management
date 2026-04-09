@@ -1,0 +1,18 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+    "ANTHROPIC_AUTH_TOKEN": "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",
+    "ANTHROPIC_API_KEY": "",
+    "ANTHROPIC_MODEL": "openai/gpt-oss-120b:free"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "Bash(mvn compile:*)",
+      "Bash(./mvnw compile:*)",
+      "Bash(JAVA_HOME=\"C:\\\\Users\\\\Le Van Thuan\\\\.jdks\\\\openjdk-25.0.2\" ./mvnw clean compile)",
+      "Bash(JAVA_HOME=\"C:\\\\Users\\\\Le Van Thuan\\\\.jdks\\\\openjdk-25.0.2\" ./mvnw compile)",
+      "Bash(JAVA_HOME=\"C:\\\\Users\\\\Le Van Thuan\\\\.jdks\\\\openjdk-25.0.2\" ./mvnw spring-boot:run)"
+    ]
+  }
+}

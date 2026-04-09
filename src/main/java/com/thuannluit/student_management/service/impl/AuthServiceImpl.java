@@ -17,7 +17,6 @@ import com.thuannluit.student_management.security.JwtUtil;
 import com.thuannluit.student_management.service.AuthService;
 import com.thuannluit.student_management.service.MessageService;
 import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -30,20 +29,72 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class AuthServiceImpl implements AuthService {
 
-    @Autowired UserRepository userRepository;
-    @Autowired RoleRepository roleRepository;
-    @Autowired AuthenticationManager authenticationManager;
-    @Autowired JwtUtil jwtUtil;
-    @Autowired PasswordEncoder passwordEncoder;
-    @Autowired CustomerUserDetailsService userDetailsService;
-    @Autowired MessageService messageService;
+    // =================================================================
+    // 1. Field Injection: Dễ dùng nhưng không được khuyến khích
+    // Spring sẽ tự động inject bean vào các trường này sau khi đối tượng được tạo.
+    // Nhược điểm: Khó test, dễ gây ra NullPointerException nếu dùng ngoài Spring context,
+    // và không thể khai báo là final.
+    // =================================================================
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private RoleRepository roleRepository;
+
+
+    // =================================================================
+    // 2. Setter Injection: Linh hoạt, dùng cho các dependency không bắt buộc
+    // Spring sẽ gọi các phương thức set...() này sau khi constructor được gọi.
+    // Ưu điểm: Cho phép thay đổi dependency trong quá trình chạy (hiếm khi cần).
+    // Nhược điểm: Class có thể tồn tại ở trạng thái chưa hoàn chỉnh (dependency chưa được set).
+    // =================================================================
+    private AuthenticationManager authenticationManager;
+    private JwtUtil jwtUtil;
+    private PasswordEncoder passwordEncoder;
+    private CustomerUserDetailsService userDetailsService;
+
+    @Autowired
+    public void setAuthenticationManager(AuthenticationManager authenticationManager) {
+        this.authenticationManager = authenticationManager;
+    }
+
+    @Autowired
+    public void setJwtUtil(JwtUtil jwtUtil) {
+        this.jwtUtil = jwtUtil;
+    }
+
+    @Autowired
+    public void setPasswordEncoder(PasswordEncoder passwordEncoder) {
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    @Autowired
+    public void setUserDetailsService(CustomerUserDetailsService userDetailsService) {
+        this.userDetailsService = userDetailsService;
+    }
+
+
+    // =================================================================
+    // 3. Constructor Injection: Cách được khuyến khích nhất (Best Practice)
+    // Các dependency được truyền vào khi đối tượng được khởi tạo.
+    // Ưu điểm: Đảm bảo các dependency bắt buộc luôn tồn tại, cho phép khai báo là `final`
+    // (bất biến), và làm cho việc viết Unit Test trở nên cực kỳ dễ dàng.
+    // =================================================================
+    private final MessageService messageService;
     private final AuthEventProducer authEventProducer;
+
+    // Spring sẽ tự động tìm các bean MessageService và AuthEventProducer để truyền vào đây.
+    // Annotation @Autowired là không bắt buộc nếu class chỉ có một constructor.
+    public AuthServiceImpl(MessageService messageService, AuthEventProducer authEventProducer) {
+        this.messageService = messageService;
+        this.authEventProducer = authEventProducer;
+    }
+
 
     @Override
     @Transactional
@@ -72,14 +123,12 @@ public class AuthServiceImpl implements AuthService {
         log.info("User registered successfully with email: {}", request.email());
 
         authEventProducer.sendMessage(AuthEvent.builder()
+                .eventId(UUID.randomUUID())
                 .action("USER_REGISTERED")
                 .email(request.email())
                 .role("ROLE_USER")
                 .timestamp(Instant.now())
                 .build());
-
-//        emailService.sendWelcomeEmail(request.email(), request.email());
-
         return messageService.get("auth.register.success");
     }
 
@@ -108,6 +157,7 @@ public class AuthServiceImpl implements AuthService {
         log.info("Admin user registered successfully with email: {}", request.email());
 
         authEventProducer.sendMessage(AuthEvent.builder()
+                .eventId(UUID.randomUUID())
                 .action("ADMIN_REGISTERED")
                 .email(request.email())
                 .role("ROLE_ADMIN")
